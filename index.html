@@ -3,18 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Gastos - Beca Fondo Dotal 2026 ($1,800)</title>
+  <title>Beca Fondo Dotal 2026 - OCR & Control de Presupuesto ($1,800)</title>
+  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Chart.js for the dynamic budget donut wheel -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for the Budget Wheel (Donut) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <!-- SheetJS (xlsx) for native Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- FontAwesome Icons for UI -->
+  
+  <!-- Tesseract.js for Optical Character Recognition (OCR in Spanish/English) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  
+  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <script>
@@ -23,14 +31,7 @@
         extend: {
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
-          },
-          colors: {
-            brand: {
-              50: '#f0fdf4',
-              500: '#16a34a',
-              600: '#15803d',
-              700: '#166534',
-            }
+            mono: ['JetBrains Mono', 'monospace'],
           }
         }
       }
@@ -38,8 +39,7 @@
   </script>
   <style>
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: #090d16;
+      background-color: #080c14;
       color: #f1f5f9;
     }
     .custom-scrollbar::-webkit-scrollbar {
@@ -47,289 +47,282 @@
       height: 6px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #0f172a;
+      background: #0b1120;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #334155;
+      background: #1e293b;
       border-radius: 9999px;
     }
-    .dropzone-active {
+    .dropzone-dragover {
       border-color: #10b981 !important;
       background-color: rgba(16, 185, 129, 0.08) !important;
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
 
-  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
           <i class="fa-solid fa-graduation-cap"></i>
         </div>
         <div>
-          <h1 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 class="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
             Beca Fondo Dotal 2026
-            <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">Fondo $1,800.00</span>
+            <span class="text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-medium">$1,800.00 Total</span>
           </h1>
-          <p class="text-xs text-slate-400 hidden sm:block">Control de gastos por especificaciones de la UPR</p>
+          <p class="text-[11px] text-slate-400">Escaneo OCR local &bull; Guardado 100% en localStorage</p>
         </div>
       </div>
 
       <div class="flex items-center space-x-2 sm:space-x-3">
-        <button id="btn-export-excel" class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-950/60 transition">
+        <button id="btn-export-excel" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-950/60 transition">
           <i class="fa-solid fa-file-excel text-emerald-200"></i>
           <span>Descargar Excel (.xlsx)</span>
         </button>
-        <button id="btn-settings-toggle" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Configurar Presupuesto o API">
-          <i class="fa-solid fa-sliders text-base"></i>
+        <button id="btn-open-settings" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition" title="Configurar fondo">
+          <i class="fa-solid fa-gear text-base"></i>
         </button>
       </div>
     </div>
   </header>
 
+  <!-- Main Container -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
     
-    <!-- Top Section: Budget Donut Wheel and Statistics Cards -->
+    <!-- Top Row: Donut Wheel and Categories breakdown -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
       
-      <!-- The Budget Donut Wheel (Interactive Circular Chart) -->
-      <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between relative overflow-hidden">
-        <div class="flex items-center justify-between mb-2">
+      <!-- Budget Wheel (Donut Chart) -->
+      <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">Balance del Fondo Dotal</h2>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Ruedita de Balance</h2>
           </div>
-          <span class="text-xs font-mono font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Fondo: $1,800.00</span>
+          <span class="text-xs font-mono text-slate-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">Total: $1,800.00</span>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-center justify-around gap-4 my-2">
-          <!-- Canvas for Chart.js Wheel -->
+        <div class="flex flex-col sm:flex-row items-center justify-around gap-4 my-3">
+          <!-- Canvas for Chart.js Donut -->
           <div class="relative w-44 h-44 flex items-center justify-center">
             <canvas id="budgetWheelCanvas"></canvas>
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-              <span id="wheel-percent-used" class="text-xl font-extrabold text-red-400">0%</span>
-              <span class="text-[10px] text-slate-400 uppercase tracking-tight">Utilizado</span>
+              <span id="wheel-percent-used" class="text-xl font-extrabold text-red-400 font-mono">0%</span>
+              <span class="text-[10px] text-slate-400 uppercase tracking-tight">Gastado</span>
             </div>
           </div>
 
-          <!-- Color Legends & Quick Info -->
-          <div class="space-y-3 w-full sm:w-auto">
-            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-4">
-              <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-md bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+          <!-- Indicators & Legend -->
+          <div class="space-y-2.5 w-full sm:w-auto">
+            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-emerald-950/50 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-md bg-emerald-500 shadow-md shadow-emerald-500/40"></span>
                 <div>
-                  <div class="text-[11px] text-slate-400 font-medium">Disponible (Verde)</div>
-                  <div id="wheel-legend-avail" class="text-base font-bold text-emerald-400">$1,800.00</div>
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Disponible (Verde)</div>
+                  <div id="wheel-legend-avail" class="text-base font-bold text-emerald-400 font-mono">$1,800.00</div>
                 </div>
               </div>
-              <span id="wheel-avail-badge" class="text-xs font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded">100%</span>
+              <span id="wheel-avail-badge" class="text-xs font-mono font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-800/40 px-2 py-0.5 rounded">100%</span>
             </div>
 
-            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-4">
-              <div class="flex items-center gap-2">
-                <span class="w-3.5 h-3.5 rounded-md bg-red-500 shadow-sm shadow-red-500/50"></span>
+            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-red-950/50 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-md bg-red-500 shadow-md shadow-red-500/40"></span>
                 <div>
-                  <div class="text-[11px] text-slate-400 font-medium">Gastado (Rojo)</div>
-                  <div id="wheel-legend-used" class="text-base font-bold text-red-400">$0.00</div>
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Gastado (Rojo)</div>
+                  <div id="wheel-legend-used" class="text-base font-bold text-red-400 font-mono">$0.00</div>
                 </div>
               </div>
-              <span id="wheel-used-badge" class="text-xs font-mono font-bold text-red-300 bg-red-950/80 border border-red-800/50 px-2 py-0.5 rounded">0%</span>
+              <span id="wheel-used-badge" class="text-xs font-mono font-bold text-red-300 bg-red-950/90 border border-red-800/40 px-2 py-0.5 rounded">0%</span>
             </div>
           </div>
         </div>
 
-        <div class="mt-2 pt-3 border-t border-slate-800/70 text-center text-xs text-slate-400 flex items-center justify-between">
-          <span id="stat-count-receipts">0 recibos ingresados</span>
-          <span id="budget-status-msg" class="text-emerald-400 font-medium">Fondo en excelente estado</span>
+        <div class="pt-3 border-t border-slate-800/80 text-xs text-slate-400 flex items-center justify-between">
+          <span id="stat-count-receipts">0 recibos guardados</span>
+          <span id="budget-status-msg" class="text-emerald-400 font-medium">Balance saludable</span>
         </div>
       </div>
 
-      <!-- Category Breakdown Quick View -->
+      <!-- Categories distribution -->
       <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
-              <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-                <i class="fa-solid fa-list-check text-emerald-400"></i>
-                Distribución por Especificación UPR
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-emerald-400"></i> Gastos por Especificación UPR
               </h2>
-              <p class="text-xs text-slate-400">Gastos divididos según el documento oficial de Fondo Dotal</p>
+              <p class="text-xs text-slate-400">Desglose según la lista oficial de usos permitidos</p>
             </div>
-            <button id="btn-quick-sample" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-2">
-              Probar con demo
+            <button id="btn-load-demo" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-4">
+              Cargar Recibo Demo
             </button>
           </div>
 
-          <!-- Dynamic Bars for Categories with Spend -->
-          <div id="category-bars-container" class="space-y-2.5 mt-3 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-            <!-- Populated via JS -->
+          <div id="category-bars-container" class="space-y-2 mt-3 max-h-44 overflow-y-auto custom-scrollbar pr-1">
             <div class="text-xs text-slate-500 text-center py-6">
-              Aún no hay gastos registrados por categoría.
+              Aún no hay gastos registrados.
             </div>
           </div>
         </div>
 
         <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-          <span>Presupuesto asignado: <strong class="text-white">$1,800.00</strong></span>
-          <span class="text-slate-400">Año académico 2026</span>
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-database text-emerald-400"></i> Guardado en localStorage</span>
+          <span class="font-mono text-slate-400">Beca Fondo Dotal 2026</span>
         </div>
       </div>
     </div>
 
+    <!-- Bottom Row: OCR Scanner & Interactive Table -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
-      <!-- Left Column: Receipt Scanner / Camera Input -->
+      <!-- Left Column: OCR Scanner Component -->
       <section class="lg:col-span-4 space-y-4">
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col space-y-4">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
           <div class="flex items-center justify-between">
             <h2 class="font-semibold text-white text-sm flex items-center gap-2">
-              <i class="fa-solid fa-camera text-emerald-400"></i>
-              Escanear Recibo
+              <i class="fa-solid fa-expand text-emerald-400"></i>
+              Escanear con OCR
             </h2>
-            <span class="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded">
-              Paso 1: Foto
+            <span class="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded font-mono">
+              Tesseract OCR Engine
             </span>
           </div>
 
-          <!-- Drag and Drop Box -->
-          <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-emerald-500/70 rounded-xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center bg-slate-950/60 group min-h-[200px] relative">
-            <input type="file" id="receipt-input" accept="image/*" class="hidden">
+          <!-- Dropzone and image selector -->
+          <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-emerald-500/80 rounded-xl p-5 text-center cursor-pointer transition flex flex-col items-center justify-center bg-slate-950/60 min-h-[220px] relative overflow-hidden group">
+            <input type="file" id="receipt-file-input" accept="image/*" class="hidden">
             
-            <div id="upload-prompt" class="space-y-3 pointer-events-none">
-              <div class="w-14 h-14 rounded-full bg-slate-800 group-hover:bg-slate-700 text-emerald-400 flex items-center justify-center mx-auto transition shadow">
-                <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+            <div id="upload-prompt" class="space-y-2.5 pointer-events-none">
+              <div class="w-12 h-12 rounded-full bg-slate-800 text-emerald-400 flex items-center justify-center mx-auto transition group-hover:scale-110">
+                <i class="fa-solid fa-file-invoice text-xl"></i>
               </div>
               <div>
-                <p class="text-sm font-medium text-slate-200">Presiona o arrastra tu recibo aquí</p>
-                <p class="text-xs text-slate-400 mt-0.5">La IA leerá los datos y te pedirá confirmar antes de guardarlo</p>
+                <p class="text-xs font-semibold text-slate-200">Arrastra o haz clic para subir foto</p>
+                <p class="text-[11px] text-slate-400">El motor de OCR leerá el recibo automáticamente</p>
               </div>
-              <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] bg-slate-800/90 text-slate-300 font-medium">
-                <i class="fa-solid fa-shield-check text-emerald-400"></i> Validación previa activada
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] bg-slate-800/90 text-slate-300 font-medium">
+                <i class="fa-solid fa-lock text-emerald-400"></i> Procesamiento local sin salir de tu equipo
               </div>
             </div>
 
-            <!-- Image Preview Box -->
+            <!-- Preview Image -->
             <div id="preview-container" class="hidden w-full relative">
-              <img id="image-preview" src="" alt="Recibo escaneado" class="w-full max-h-56 object-contain rounded-lg border border-slate-700 bg-slate-900" />
-              <button id="btn-remove-image" class="absolute top-2 right-2 bg-slate-900/90 text-red-400 hover:text-red-300 border border-slate-700 p-1.5 rounded-lg shadow transition" title="Quitar imagen">
+              <img id="image-preview" src="" alt="Vista previa del recibo" class="w-full max-h-52 object-contain rounded-lg border border-slate-700 bg-slate-900" />
+              <button id="btn-remove-image" class="absolute top-2 right-2 bg-slate-900/90 text-red-400 hover:text-red-300 border border-slate-700 p-1.5 rounded-lg shadow transition" title="Quitar">
                 <i class="fa-solid fa-xmark text-sm"></i>
               </button>
             </div>
 
-            <!-- Processing Loading Overlay -->
-            <div id="processing-spinner" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 z-10">
-              <div class="w-12 h-12 rounded-full border-4 border-slate-700 border-t-emerald-400 animate-spin"></div>
-              <p class="text-sm font-semibold text-white mt-3">Leyendo recibo con IA...</p>
-              <p id="processing-subtext" class="text-xs text-slate-400 mt-1 text-center">Extrayendo fecha, hora, tienda, monto y categoría UPR...</p>
+            <!-- OCR Progress overlay -->
+            <div id="ocr-progress-overlay" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 z-20 space-y-3">
+              <div class="w-10 h-10 rounded-full border-3 border-slate-700 border-t-emerald-400 animate-spin"></div>
+              <div class="text-center space-y-1">
+                <p id="ocr-status-title" class="text-xs font-semibold text-white">Iniciando reconocimiento óptico OCR...</p>
+                <p id="ocr-status-sub" class="text-[10px] font-mono text-emerald-400">0%</p>
+              </div>
+              <div class="w-48 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div id="ocr-progress-bar" class="bg-emerald-400 h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+              </div>
             </div>
           </div>
 
-          <!-- Buttons for upload and camera -->
+          <!-- Camera and Upload buttons -->
           <div class="grid grid-cols-2 gap-2">
-            <button id="btn-trigger-upload" class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition">
-              <i class="fa-solid fa-image text-slate-400"></i> Subir foto
+            <button id="btn-upload-file" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-upload text-slate-400"></i> Subir imagen
             </button>
-            <button id="btn-trigger-camera" class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition">
+            <button id="btn-open-camera" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition">
               <i class="fa-solid fa-camera text-slate-400"></i> Tomar foto
             </button>
           </div>
 
-          <!-- Manual Register fallback -->
-          <div class="pt-2 border-t border-slate-800">
-            <button id="btn-open-manual" class="w-full py-2 text-xs text-slate-400 hover:text-emerald-400 font-medium flex items-center justify-center gap-1.5 transition">
-              <i class="fa-solid fa-pen-to-square"></i> Ingresar gasto manualmente
-            </button>
-          </div>
+          <button id="btn-manual-entry" class="w-full py-2 text-xs text-slate-400 hover:text-emerald-400 font-medium flex items-center justify-center gap-1.5 transition border-t border-slate-800 pt-3">
+            <i class="fa-solid fa-pen"></i> Entrada manual de recibo
+          </button>
         </div>
 
-        <!-- UPR Policy Guidance Card -->
+        <!-- UPR Categories guide -->
         <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-300 space-y-2">
           <div class="font-semibold text-emerald-400 flex items-center gap-1.5">
-            <i class="fa-solid fa-circle-info"></i> Usos Permitidos (Fondo Dotal UPR):
+            <i class="fa-solid fa-shield-halved"></i> Usos Permitidos (Fondo Dotal 2026):
           </div>
           <ul class="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
-            <li>Matrícula, Cuotas y Laboratorios</li>
+            <li>Matrícula, Cuotas, Laboratorios</li>
             <li>Gasto en libros y materiales para prácticas</li>
-            <li>Transportación (gasolina, peaje, transporte público)</li>
+            <li>Transportación (gasolina, peaje, transportación pública)</li>
             <li>Alimentos y Hospedaje o dormitorio</li>
-            <li>Computadora / iPads / tabletas / impresoras</li>
-            <li>Cursos especializados, conferencias y viajes educativos</li>
+            <li>Computadora u otros equipos (iPads, tintas, lápiz)</li>
+            <li>Vestimenta para estudios, conferencias, viajes educativos</li>
           </ul>
         </div>
       </section>
 
-      <!-- Right Column: Interactive Excel Spreadsheet Table -->
+      <!-- Right Column: Interactive Excel Sheet -->
       <section class="lg:col-span-8 flex flex-col space-y-4">
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col h-full">
           
-          <!-- Excel Sheet Header Controls -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
             <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-500/30">
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-500/30">
                 <i class="fa-solid fa-table"></i>
               </div>
               <div>
-                <h2 class="font-semibold text-white text-base flex items-center gap-2">
-                  Hoja: <span class="text-emerald-400 font-mono">Beca_Fondo_Dotal_1800.xlsx</span>
+                <h2 class="font-bold text-white text-sm sm:text-base flex items-center gap-2">
+                  Hoja de Gastos Fondo Dotal
+                  <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">UPR-2026</span>
                 </h2>
-                <p class="text-xs text-slate-400">Cada gasto incluye número de recibo, tienda, fecha, hora y categoría</p>
+                <p class="text-xs text-slate-400">Datos guardados en tu navegador (localStorage). Haz clic para editar cualquier valor.</p>
               </div>
             </div>
 
-            <!-- Table Filters and Export -->
-            <div class="flex items-center flex-wrap gap-2">
+            <div class="flex items-center gap-2">
               <div class="relative">
-                <input type="text" id="table-search" placeholder="Buscar comercio o gasto..." class="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg pl-7 pr-3 py-1.5 focus:outline-none focus:border-emerald-500 w-36 sm:w-48">
+                <input type="text" id="search-input" placeholder="Buscar comercio..." class="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg pl-7 pr-3 py-1.5 focus:outline-none focus:border-emerald-500 w-36 sm:w-44 font-sans">
                 <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-500 text-xs"></i>
               </div>
-              <button id="btn-clear-table" class="px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition" title="Vaciar lista">
+              <button id="btn-clear-all" class="px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition" title="Borrar todo de localStorage">
                 <i class="fa-solid fa-trash-can mr-1"></i> Borrar Todo
               </button>
             </div>
           </div>
 
-          <!-- Table Container with Excel Grid Look -->
-          <div class="flex-1 overflow-x-auto custom-scrollbar mt-4 border border-slate-800 rounded-xl bg-slate-950/60 max-h-[520px]">
+          <!-- Table with custom scroll -->
+          <div class="flex-1 overflow-x-auto custom-scrollbar mt-4 border border-slate-800 rounded-xl bg-slate-950/60 max-h-[500px]">
             <table class="w-full text-left text-xs border-collapse min-w-[850px]">
-              <thead class="bg-slate-800/90 sticky top-0 z-20 text-slate-300 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-700">
+              <thead class="bg-slate-800/90 sticky top-0 z-10 text-slate-300 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-700 font-mono">
                 <tr>
-                  <th class="p-3 w-16 text-center text-slate-400 font-mono"># Recibo</th>
+                  <th class="p-3 w-20 text-center"># Recibo</th>
                   <th class="p-3 w-36">Fecha y Hora</th>
                   <th class="p-3 w-40">Dónde se compró</th>
                   <th class="p-3 w-44">Categoría UPR</th>
                   <th class="p-3 w-28 text-right font-bold text-red-400">Monto ($)</th>
-                  <th class="p-3">Descripción de lo comprado</th>
-                  <th class="p-3 w-20 text-center">Acciones</th>
+                  <th class="p-3">Descripción</th>
+                  <th class="p-3 w-16 text-center">Acción</th>
                 </tr>
               </thead>
-              <tbody id="excel-table-body" class="divide-y divide-slate-800/80 text-slate-300">
-                <!-- Rows populated via JS -->
+              <tbody id="receipts-tbody" class="divide-y divide-slate-800/80 text-slate-300">
+                <!-- Dynamically generated rows -->
               </tbody>
             </table>
 
-            <!-- Empty State -->
-            <div id="table-empty-state" class="py-16 text-center space-y-3">
-              <div class="w-14 h-14 rounded-full bg-slate-900 border border-slate-800 text-slate-600 flex items-center justify-center mx-auto text-xl">
-                <i class="fa-solid fa-receipt"></i>
-              </div>
-              <div class="text-sm font-medium text-slate-300">Aún no hay recibos registrados en la beca</div>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto">
-                Sube o toma una foto del recibo a la izquierda. La app leerá la información y te preguntará si está correcta antes de meterla a este Excel.
-              </p>
+            <div id="empty-state" class="py-14 text-center space-y-2 hidden">
+              <i class="fa-solid fa-receipt text-3xl text-slate-600"></i>
+              <p class="text-xs font-semibold text-slate-300">No hay recibos registrados en localStorage</p>
+              <p class="text-[11px] text-slate-500">Sube una foto a la izquierda para procesarla con OCR o ingresa manualmente.</p>
             </div>
           </div>
 
-          <!-- Table Footer Stats -->
+          <!-- Footer stats -->
           <div class="pt-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2 border-t border-slate-800/80 mt-3">
-            <div class="flex items-center gap-2">
-              <span id="row-count-badge" class="bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">0 recibos</span>
-              <span>Guardado en memoria de tu navegador</span>
-            </div>
-            <div class="flex items-center gap-5 text-slate-300">
-              <div>Total Beca: <span class="font-mono font-medium text-white">$1,800.00</span></div>
-              <div>Gastado: <span id="footer-used" class="font-mono font-bold text-red-400">$0.00</span></div>
-              <div>Disponible: <span id="footer-avail" class="font-mono font-bold text-emerald-400 text-sm">$1,800.00</span></div>
+            <span id="footer-count-badge" class="font-mono text-slate-400">0 registros</span>
+            <div class="flex items-center gap-5">
+              <div>Fondo: <span class="font-mono text-white font-semibold">$1,800.00</span></div>
+              <div>Gastado: <span id="footer-spent" class="font-mono font-bold text-red-400">$0.00</span></div>
+              <div>Disponible: <span id="footer-remaining" class="font-mono font-bold text-emerald-400 text-sm">$1,800.00</span></div>
             </div>
           </div>
 
@@ -338,14 +331,15 @@
     </div>
   </main>
 
+  <!-- Review Modal: Verify before inserting -->
   <div id="modal-review" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
           <h3 class="font-bold text-white text-base flex items-center gap-2">
-            <i class="fa-solid fa-clipboard-check text-emerald-400"></i> Verificar Información del Recibo
+            <i class="fa-solid fa-clipboard-check text-emerald-400"></i> Confirmar Datos del Recibo
           </h3>
-          <p class="text-xs text-slate-400">Revisa o edita los datos antes de ingresarlos formalmente a la hoja de cálculo</p>
+          <p class="text-xs text-slate-400">Verifica la información leída por el OCR antes de registrarla en el Excel</p>
         </div>
         <button id="btn-close-review" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
@@ -354,62 +348,68 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-slate-300 font-medium mb-1"># de Recibo</label>
-            <input type="text" id="rev-receipt-no" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+            <input type="text" id="rev-no" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
           </div>
           <div>
-            <label class="block text-slate-300 font-medium mb-1">Monto Total Gastado ($)</label>
+            <label class="block text-slate-300 font-medium mb-1">Monto Total ($)</label>
             <input type="number" step="0.01" id="rev-amount" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500">
           </div>
         </div>
 
         <div>
-          <label class="block text-slate-300 font-medium mb-1">¿Dónde fue la compra? (Comercio / Lugar)</label>
-          <input type="text" id="rev-merchant" required placeholder="Ej: Librería UPR, Walmart, Shell, Cafetería..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
+          <label class="block text-slate-300 font-medium mb-1">¿Dónde fue la compra? (Lugar / Tienda)</label>
+          <input type="text" id="rev-merchant" required placeholder="Ej: Librería UPR, Shell, Puma, Walmart, Cafetería..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-slate-300 font-medium mb-1">Fecha de Compra</label>
+            <label class="block text-slate-300 font-medium mb-1">Fecha</label>
             <input type="date" id="rev-date" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
           </div>
           <div>
-            <label class="block text-slate-300 font-medium mb-1">Hora de Compra</label>
+            <label class="block text-slate-300 font-medium mb-1">Hora</label>
             <input type="time" id="rev-time" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
           </div>
         </div>
 
         <div>
-          <label class="block text-slate-300 font-medium mb-1 flex items-center justify-between">
-            <span>Categoría de Uso Permitido (Documento UPR)</span>
-            <span class="text-[10px] text-emerald-400">Oficial Fondo Dotal</span>
-          </label>
-          <select id="rev-category" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500 text-xs">
+          <label class="block text-slate-300 font-medium mb-1">Categoría UPR (Fondo Dotal 2026)</label>
+          <select id="rev-category" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500">
             <option value="Alimentos">Alimentos</option>
-            <option value="Transportación (gasolina, peaje, pública)">Transportación (gasolina, peaje, transportación pública)</option>
+            <option value="Transportación (gasolina, peaje, transportación pública)">Transportación (gasolina, peaje, transportación pública)</option>
             <option value="Gasto en libros">Gasto en libros</option>
-            <option value="Materiales para prácticas del programa">Materiales para prácticas del programa que cursan</option>
-            <option value="Computadora o equipos electrónicos">Computadora u otros equipos electrónicos (iPads, tabletas, tintas, etc.)</option>
+            <option value="Materiales para prácticas del programa que cursan">Materiales para prácticas del programa que cursan</option>
+            <option value="Computadora u otros equipos electrónicos como iPads, tabletas, impresoras, tintas, lápiz">Computadora u otros equipos electrónicos (iPads, impresoras, tintas)</option>
             <option value="Matrícula">Matrícula</option>
             <option value="Cuotas">Cuotas</option>
             <option value="Laboratorios">Laboratorios</option>
             <option value="Hospedaje o dormitorio">Hospedaje o dormitorio</option>
             <option value="Vestimenta relacionada a estudios">Vestimenta relacionada a estudios</option>
-            <option value="Cursos especializados o mejoramiento">Cursos especializados o de mejoramiento profesional</option>
-            <option value="Pago o viajes a conferencias educativas">Pago de conferencia o gastos de viajes a conferencias</option>
-            <option value="Programa de computadora especializado">Programa de computadora especializado (Software)</option>
-            <option value="Cuota para exámenes de entrada">Cuota para exámenes de entrada a estudios graduados</option>
-            <option value="Estudios híbridos (Internet/adaptación)">Para estudios híbridos - gastos de internet o adaptación</option>
+            <option value="Cursos especializados o cursos de mejoramiento profesional">Cursos especializados o de mejoramiento profesional</option>
+            <option value="Pago de conferencia virtual o presencial">Pago de conferencia virtual o presencial</option>
+            <option value="Gastos de viajes a conferencias o experiencias educativas">Gastos de viajes a conferencias o experiencias educativas</option>
+            <option value="Programa de computadora especializado">Programa de computadora especializado</option>
+            <option value="Cuota para exámenes de entrada a estudios graduados">Cuota para exámenes de entrada a estudios graduados</option>
+            <option value="Para estudios híbridos - gastos asociados a la adaptación (Internet, equipo)">Para estudios híbridos - gastos de internet o adaptación</option>
             <option value="Otro gasto justificado">Otro gasto justificado</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-slate-300 font-medium mb-1">Descripción / Artículos Comprados</label>
-          <textarea id="rev-description" rows="2.5" placeholder="Ej: Gasolina regular, Almuerzo, Cuadernos y lápices..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500"></textarea>
+          <label class="block text-slate-300 font-medium mb-1">Descripción / Artículos</label>
+          <textarea id="rev-desc" rows="2" placeholder="Detalle de la compra..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-emerald-500"></textarea>
+        </div>
+
+        <!-- Raw OCR preview box (collapsible) -->
+        <div>
+          <details class="text-[11px] text-slate-400">
+            <summary class="cursor-pointer hover:text-slate-300">Ver texto crudo detectado por OCR</summary>
+            <pre id="raw-ocr-text" class="mt-2 p-2 bg-slate-950 border border-slate-800 rounded font-mono text-[10px] text-slate-400 max-h-24 overflow-y-auto whitespace-pre-wrap"></pre>
+          </details>
         </div>
 
         <div class="pt-3 border-t border-slate-800 flex justify-end gap-2.5">
-          <button type="button" id="btn-cancel-review" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium">
+          <button type="button" id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium">
             Descartar
           </button>
           <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-emerald-950">
@@ -420,94 +420,80 @@
     </div>
   </div>
 
+  <!-- Settings Modal -->
   <div id="modal-settings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="font-semibold text-white text-base flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-emerald-400"></i> Ajustes de la Beca
-        </h3>
+        <h3 class="font-semibold text-white text-sm">Configuración de Fondo</h3>
         <button id="btn-close-settings" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <div class="space-y-4 text-xs">
+      <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-slate-300 font-medium mb-1">Fondo Total Asignado ($)</label>
-          <input type="number" id="setting-total-fund" value="1800.00" step="1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
-          <p class="text-[11px] text-slate-500 mt-1">Por defecto: $1,800.00 para la Beca Fondo Dotal 2026.</p>
+          <label class="block text-slate-300 font-medium mb-1">Monto Asignado ($)</label>
+          <input type="number" id="setting-fund-amount" value="1800.00" step="1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+          <p class="text-[10px] text-slate-500 mt-1">Por defecto: $1,800.00 para la Beca Fondo Dotal UPR.</p>
         </div>
 
-        <div>
-          <label class="block text-slate-300 font-medium mb-1">Gemini API Key (Opcional)</label>
-          <input type="password" id="custom-api-key" placeholder="Dejar en blanco para usar la integrada" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div class="pt-2 flex justify-between items-center border-t border-slate-800">
-          <button id="btn-reset-demo" class="text-red-400 hover:underline text-[11px]">Restablecer datos</button>
-          <button id="btn-save-settings" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium">Guardar Cambios</button>
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+          <button id="btn-save-fund" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold">Guardar</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification Component -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+  <!-- Toast Notification Container -->
+  <div id="toast-box" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
   <script>
-    const STORAGE_KEY = 'fondodotal_receipts_v2';
-    const SETTINGS_KEY = 'fondodotal_settings_v2';
+    // Constants & Keys
+    const LS_KEY_RECEIPTS = 'beca_upr_receipts_v3';
+    const LS_KEY_FUND = 'beca_upr_fund_amount_v3';
 
     let totalFund = 1800.00;
-    let records = [];
-    let settings = {
-      apiKey: '',
-      totalFund: 1800.00
-    };
-
+    let receipts = [];
     let budgetChart = null;
 
-    // DOM Elements
+    // Elements
     const dropZone = document.getElementById('drop-zone');
-    const receiptInput = document.getElementById('receipt-input');
+    const receiptFileInput = document.getElementById('receipt-file-input');
     const uploadPrompt = document.getElementById('upload-prompt');
     const previewContainer = document.getElementById('preview-container');
     const imagePreview = document.getElementById('image-preview');
     const btnRemoveImage = document.getElementById('btn-remove-image');
-    const processingSpinner = document.getElementById('processing-spinner');
-    const processingSubtext = document.getElementById('processing-subtext');
-    const tableBody = document.getElementById('excel-table-body');
-    const tableEmptyState = document.getElementById('table-empty-state');
-    const tableSearch = document.getElementById('table-search');
-    const toastContainer = document.getElementById('toast-container');
+    
+    // OCR Progress Elements
+    const ocrOverlay = document.getElementById('ocr-progress-overlay');
+    const ocrTitle = document.getElementById('ocr-status-title');
+    const ocrSub = document.getElementById('ocr-status-sub');
+    const ocrBar = document.getElementById('ocr-progress-bar');
+    const rawOcrTextEl = document.getElementById('raw-ocr-text');
 
-    // Review Modal Elements
+    // Review Modal
     const modalReview = document.getElementById('modal-review');
     const formReview = document.getElementById('form-review');
     const btnCloseReview = document.getElementById('btn-close-review');
-    const btnCancelReview = document.getElementById('btn-cancel-review');
+    const btnCancelModal = document.getElementById('btn-cancel-modal');
 
-    // Toast Notification (safe alternative to native alert)
+    // Table elements
+    const tbody = document.getElementById('receipts-tbody');
+    const emptyState = document.getElementById('empty-state');
+    const searchInput = document.getElementById('search-input');
+
+    // Toast helper
     function showToast(message, type = 'info') {
+      const box = document.getElementById('toast-box');
       const toast = document.createElement('div');
-      const colors = {
-        success: 'bg-emerald-950 border-emerald-700 text-emerald-200',
-        error: 'bg-red-950 border-red-700 text-red-200',
-        info: 'bg-slate-900 border-slate-700 text-slate-200',
-        warning: 'bg-amber-950 border-amber-700 text-amber-200'
-      };
       const icons = {
-        success: 'fa-circle-check text-emerald-400',
-        error: 'fa-circle-exclamation text-red-400',
+        success: 'fa-check text-emerald-400',
+        error: 'fa-triangle-exclamation text-red-400',
         info: 'fa-circle-info text-blue-400',
-        warning: 'fa-triangle-exclamation text-amber-400'
+        warning: 'fa-circle-exclamation text-amber-400'
       };
-
-      toast.className = `border px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 text-xs transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto max-w-sm ${colors[type] || colors.info}`;
-      toast.innerHTML = `
-        <i class="fa-solid ${icons[type] || icons.info} text-base flex-shrink-0"></i>
-        <div class="flex-1 font-medium">${message}</div>
-      `;
-
-      toastContainer.appendChild(toast);
+      toast.className = `bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl shadow-2xl text-xs flex items-center space-x-3 text-slate-200 pointer-events-auto transform transition duration-300 translate-y-2 opacity-0 max-w-sm`;
+      toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-sm"></i><span>${message}</span>`;
+      box.appendChild(toast);
+      
       requestAnimationFrame(() => {
         toast.classList.remove('translate-y-2', 'opacity-0');
       });
@@ -515,10 +501,11 @@
       setTimeout(() => {
         toast.classList.add('opacity-0', 'translate-x-4');
         setTimeout(() => toast.remove(), 300);
-      }, 4000);
+      }, 3500);
     }
 
-    function initBudgetChart() {
+    // Initialize Chart.js
+    function initChart() {
       const ctx = document.getElementById('budgetWheelCanvas').getContext('2d');
       budgetChart = new Chart(ctx, {
         type: 'doughnut',
@@ -529,7 +516,7 @@
             backgroundColor: ['#10b981', '#ef4444'],
             borderColor: ['#047857', '#b91c1c'],
             borderWidth: 2,
-            hoverOffset: 4
+            hoverOffset: 3
           }]
         },
         options: {
@@ -540,10 +527,10 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: function(context) {
-                  const val = context.raw || 0;
+                label: function(ctx) {
+                  const val = ctx.raw || 0;
                   const pct = ((val / totalFund) * 100).toFixed(1);
-                  return ` ${context.label}: $${val.toFixed(2)} (${pct}%)`;
+                  return ` ${ctx.label}: $${val.toFixed(2)} (${pct}%)`;
                 }
               }
             }
@@ -552,94 +539,84 @@
       });
     }
 
-    function loadSavedData() {
+    // Storage Management
+    function loadFromLocalStorage() {
       try {
-        const storedRec = localStorage.getItem(STORAGE_KEY);
-        if (storedRec) {
-          records = JSON.parse(storedRec);
-        } else {
-          // Pre-populate with realistic UPR Fondo Dotal receipts
-          records = [
-            {
-              id: 'rec_1',
-              receiptNo: 'REC-001',
-              date: '2026-02-10',
-              time: '11:15',
-              merchant: 'Librería Universitaria UPR',
-              category: 'Gasto en libros',
-              amount: 145.50,
-              description: 'Libro de Cálculo Avanzado y libreta de notas'
-            },
-            {
-              id: 'rec_2',
-              receiptNo: 'REC-002',
-              date: '2026-02-18',
-              time: '08:45',
-              merchant: 'Puma Energy Isabela',
-              category: 'Transportación (gasolina, peaje, pública)',
-              amount: 40.00,
-              description: 'Gasolina regular para transportación a clases'
-            },
-            {
-              id: 'rec_3',
-              receiptNo: 'REC-003',
-              date: '2026-03-02',
-              time: '13:20',
-              merchant: 'Cafetería Colegial',
-              category: 'Alimentos',
-              amount: 14.75,
-              description: 'Almuerzo durante horario de estudios'
-            }
-          ];
-          saveRecords();
+        const storedFund = localStorage.getItem(LS_KEY_FUND);
+        if (storedFund) {
+          totalFund = parseFloat(storedFund) || 1800.00;
+          document.getElementById('setting-fund-amount').value = totalFund;
         }
 
-        const storedSet = localStorage.getItem(SETTINGS_KEY);
-        if (storedSet) {
-          settings = { ...settings, ...JSON.parse(storedSet) };
-          totalFund = settings.totalFund || 1800.00;
-          document.getElementById('setting-total-fund').value = totalFund;
-          document.getElementById('custom-api-key').value = settings.apiKey || '';
+        const storedReceipts = localStorage.getItem(LS_KEY_RECEIPTS);
+        if (storedReceipts) {
+          receipts = JSON.parse(storedReceipts);
+        } else {
+          // Initial sample data if completely empty
+          receipts = [
+            {
+              id: 'rec_101',
+              receiptNo: 'REC-001',
+              date: '2026-02-14',
+              time: '10:30',
+              merchant: 'Librería Colegial UPR',
+              category: 'Gasto en libros',
+              amount: 125.00,
+              description: 'Libros de texto de ingeniería y libreta'
+            },
+            {
+              id: 'rec_102',
+              receiptNo: 'REC-002',
+              date: '2026-02-20',
+              time: '16:15',
+              merchant: 'TotalEnergies Mayagüez',
+              category: 'Transportación (gasolina, peaje, transportación pública)',
+              amount: 45.00,
+              description: 'Gasolina para transporte a clases'
+            }
+          ];
+          saveToLocalStorage();
         }
-      } catch (err) {
-        console.error('Error cargando datos locales:', err);
+      } catch (e) {
+        console.error('Error loading localStorage:', e);
       }
+
       renderTable();
       updateDashboard();
     }
 
-    function saveRecords() {
+    function saveToLocalStorage() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        localStorage.setItem(LS_KEY_RECEIPTS, JSON.stringify(receipts));
+        localStorage.setItem(LS_KEY_FUND, totalFund.toString());
       } catch (e) {
-        console.error('Error guardando registros:', e);
+        console.error('Error saving to localStorage:', e);
       }
     }
 
+    // Update Wheel & Stats
     function updateDashboard() {
-      const totalSpent = records.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
+      const totalSpent = receipts.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
       const remaining = Math.max(0, totalFund - totalSpent);
 
       const percentUsed = Math.min(100, (totalSpent / totalFund) * 100);
       const percentAvail = Math.max(0, 100 - percentUsed);
 
-      // Update Wheel Chart
       if (budgetChart) {
         budgetChart.data.datasets[0].data = [remaining, totalSpent];
         budgetChart.update();
       }
 
-      // Update Center text of Donut
       document.getElementById('wheel-percent-used').textContent = `${percentUsed.toFixed(1)}%`;
       document.getElementById('wheel-legend-avail').textContent = `$${remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       document.getElementById('wheel-legend-used').textContent = `$${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       document.getElementById('wheel-avail-badge').textContent = `${percentAvail.toFixed(1)}%`;
       document.getElementById('wheel-used-badge').textContent = `${percentUsed.toFixed(1)}%`;
 
-      document.getElementById('footer-used').textContent = `$${totalSpent.toFixed(2)}`;
-      document.getElementById('footer-avail').textContent = `$${remaining.toFixed(2)}`;
-      document.getElementById('stat-count-receipts').textContent = `${records.length} ${records.length === 1 ? 'recibo ingresado' : 'recibos ingresados'}`;
-      document.getElementById('row-count-badge').textContent = `${records.length} ${records.length === 1 ? 'fila' : 'filas'}`;
+      document.getElementById('footer-spent').textContent = `$${totalSpent.toFixed(2)}`;
+      document.getElementById('footer-remaining').textContent = `$${remaining.toFixed(2)}`;
+      document.getElementById('stat-count-receipts').textContent = `${receipts.length} ${receipts.length === 1 ? 'recibo guardado' : 'recibos guardados'}`;
+      document.getElementById('footer-count-badge').textContent = `${receipts.length} ${receipts.length === 1 ? 'fila' : 'filas'}`;
 
       const statusMsg = document.getElementById('budget-status-msg');
       if (remaining <= 0) {
@@ -649,11 +626,10 @@
         statusMsg.textContent = 'Queda poco balance disponible';
         statusMsg.className = 'text-amber-400 font-medium';
       } else {
-        statusMsg.textContent = 'Fondo en excelente estado';
+        statusMsg.textContent = 'Balance saludable';
         statusMsg.className = 'text-emerald-400 font-medium';
       }
 
-      // Update Category Breakdown Bars
       renderCategoryBars(totalSpent);
     }
 
@@ -661,67 +637,67 @@
       const container = document.getElementById('category-bars-container');
       container.innerHTML = '';
 
-      if (records.length === 0) {
-        container.innerHTML = '<div class="text-xs text-slate-500 text-center py-6">Aún no hay gastos registrados por categoría.</div>';
+      if (receipts.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500 text-center py-6">Aún no hay gastos registrados.</div>';
         return;
       }
 
       const catMap = {};
-      records.forEach(r => {
+      receipts.forEach(r => {
         const cat = r.category || 'Otros';
         catMap[cat] = (catMap[cat] || 0) + (parseFloat(r.amount) || 0);
       });
 
-      // Sort descending
       const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
 
-      sorted.forEach(([cat, amount]) => {
-        const pctOfFund = ((amount / totalFund) * 100).toFixed(1);
+      sorted.forEach(([cat, amt]) => {
+        const pct = ((amt / totalFund) * 100).toFixed(1);
         const bar = document.createElement('div');
-        bar.className = 'bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 space-y-1';
+        bar.className = 'bg-slate-950/70 p-2 rounded-xl border border-slate-800 flex flex-col space-y-1';
         bar.innerHTML = `
           <div class="flex justify-between items-center text-xs">
-            <span class="font-medium text-slate-200 truncate pr-2">${escapeHtml(cat)}</span>
+            <span class="font-medium text-slate-300 truncate pr-2">${escapeHtml(cat)}</span>
             <div class="flex items-center gap-2 flex-shrink-0">
-              <span class="font-mono font-bold text-white">$${amount.toFixed(2)}</span>
-              <span class="text-[10px] text-slate-400 font-mono">(${pctOfFund}% del fondo)</span>
+              <span class="font-mono font-bold text-white">$${amt.toFixed(2)}</span>
+              <span class="text-[10px] text-slate-400 font-mono">(${pct}% de la beca)</span>
             </div>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-1.5 rounded-full" style="width: ${Math.min(100, (amount / totalSpent) * 100)}%"></div>
+            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-1.5 rounded-full" style="width: ${Math.min(100, (amt / totalSpent) * 100)}%"></div>
           </div>
         `;
         container.appendChild(bar);
       });
     }
 
+    // Render Spreadsheet Table
     function renderTable() {
-      const searchTerm = (tableSearch.value || '').trim().toLowerCase();
-      const filtered = records.filter(r => {
-        if (!searchTerm) return true;
+      const query = (searchInput.value || '').trim().toLowerCase();
+      const filtered = receipts.filter(r => {
+        if (!query) return true;
         return (
-          (r.receiptNo && r.receiptNo.toLowerCase().includes(searchTerm)) ||
-          (r.merchant && r.merchant.toLowerCase().includes(searchTerm)) ||
-          (r.category && r.category.toLowerCase().includes(searchTerm)) ||
-          (r.description && r.description.toLowerCase().includes(searchTerm))
+          (r.receiptNo && r.receiptNo.toLowerCase().includes(query)) ||
+          (r.merchant && r.merchant.toLowerCase().includes(query)) ||
+          (r.category && r.category.toLowerCase().includes(query)) ||
+          (r.description && r.description.toLowerCase().includes(query))
         );
       });
 
-      tableBody.innerHTML = '';
+      tbody.innerHTML = '';
 
       if (filtered.length === 0) {
-        tableEmptyState.classList.remove('hidden');
+        emptyState.classList.remove('hidden');
       } else {
-        tableEmptyState.classList.add('hidden');
+        emptyState.classList.add('hidden');
 
-        filtered.forEach((rec) => {
+        filtered.forEach(rec => {
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-slate-800/40 transition group';
           tr.dataset.id = rec.id;
 
           tr.innerHTML = `
             <td class="p-3 text-center">
-              <input type="text" value="${escapeHtml(rec.receiptNo || '')}" data-field="receiptNo" class="bg-slate-900/60 border border-slate-700/80 rounded px-1.5 py-1 text-emerald-400 font-mono font-bold text-center outline-none w-20">
+              <input type="text" value="${escapeHtml(rec.receiptNo || '')}" data-field="receiptNo" class="bg-slate-900 border border-slate-700/80 rounded px-1.5 py-1 text-emerald-400 font-mono font-bold text-center outline-none w-20">
             </td>
             <td class="p-3">
               <div class="flex items-center gap-1">
@@ -736,218 +712,123 @@
               <select data-field="category" class="bg-slate-900 border border-transparent hover:border-slate-700 focus:border-emerald-500 rounded px-1.5 py-1 text-xs text-slate-300 outline-none w-full">
                 <option value="${escapeHtml(rec.category)}">${escapeHtml(rec.category)}</option>
                 <option value="Alimentos">Alimentos</option>
-                <option value="Transportación (gasolina, peaje, pública)">Transportación (gasolina, peaje, pública)</option>
+                <option value="Transportación (gasolina, peaje, transportación pública)">Transportación (gasolina, peaje, pública)</option>
                 <option value="Gasto en libros">Gasto en libros</option>
-                <option value="Materiales para prácticas del programa">Materiales para prácticas del programa</option>
-                <option value="Computadora o equipos electrónicos">Computadora o equipos electrónicos</option>
+                <option value="Materiales para prácticas del programa que cursan">Materiales para prácticas</option>
+                <option value="Computadora u otros equipos electrónicos como iPads, tabletas, impresoras, tintas, lápiz">Computadora / iPads / equipos</option>
                 <option value="Matrícula">Matrícula</option>
                 <option value="Cuotas">Cuotas</option>
                 <option value="Laboratorios">Laboratorios</option>
                 <option value="Hospedaje o dormitorio">Hospedaje o dormitorio</option>
                 <option value="Vestimenta relacionada a estudios">Vestimenta relacionada a estudios</option>
-                <option value="Cursos especializados o mejoramiento">Cursos especializados o mejoramiento</option>
-                <option value="Pago o viajes a conferencias educativas">Pago o viajes a conferencias educativas</option>
-                <option value="Programa de computadora especializado">Programa de computadora especializado</option>
-                <option value="Cuota para exámenes de entrada">Cuota para exámenes de entrada</option>
-                <option value="Estudios híbridos (Internet/adaptación)">Estudios híbridos (Internet/adaptación)</option>
+                <option value="Cursos especializados o cursos de mejoramiento profesional">Cursos especializados</option>
+                <option value="Pago de conferencia virtual o presencial">Pago o viajes a conferencias</option>
+                <option value="Programa de computadora especializado">Programa de computadora</option>
+                <option value="Para estudios híbridos - gastos asociados a la adaptación (Internet, equipo)">Estudios híbridos (Internet)</option>
                 <option value="Otro gasto justificado">Otro gasto justificado</option>
               </select>
             </td>
             <td class="p-3 text-right">
-              <input type="number" step="0.01" value="${(rec.amount !== undefined ? rec.amount : 0)}" data-field="amount" class="bg-transparent border border-transparent hover:border-slate-700 focus:border-emerald-500 focus:bg-slate-900 rounded px-1.5 py-1 text-right font-bold text-red-400 font-mono outline-none w-24">
+              <input type="number" step="0.01" value="${rec.amount || 0}" data-field="amount" class="bg-transparent border border-transparent hover:border-slate-700 focus:border-emerald-500 focus:bg-slate-900 rounded px-1.5 py-1 text-right font-bold text-red-400 font-mono outline-none w-24">
             </td>
             <td class="p-3">
-              <input type="text" value="${escapeHtml(rec.description || '')}" data-field="description" placeholder="Detalle..." class="bg-transparent border border-transparent hover:border-slate-700 focus:border-emerald-500 focus:bg-slate-900 rounded px-1.5 py-1 text-slate-300 text-xs outline-none w-full">
+              <input type="text" value="${escapeHtml(rec.description || '')}" data-field="description" class="bg-transparent border border-transparent hover:border-slate-700 focus:border-emerald-500 focus:bg-slate-900 rounded px-1.5 py-1 text-slate-300 text-xs outline-none w-full">
             </td>
             <td class="p-3 text-center">
-              <div class="flex items-center justify-center gap-1">
-                <button class="btn-delete-row text-slate-500 hover:text-red-400 p-1.5 rounded transition" title="Eliminar fila">
-                  <i class="fa-solid fa-trash text-xs"></i>
-                </button>
-              </div>
+              <button class="btn-delete-row text-slate-500 hover:text-red-400 p-1.5 rounded transition" title="Eliminar fila">
+                <i class="fa-solid fa-trash text-xs"></i>
+              </button>
             </td>
           `;
 
-          tableBody.appendChild(tr);
+          tbody.appendChild(tr);
         });
       }
     }
 
-    function escapeHtml(string) {
-      if (!string) return '';
-      return String(string)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]);
     }
 
-    // Table change listener for inline editing
-    tableBody.addEventListener('change', (e) => {
+    // Inline edit listener
+    tbody.addEventListener('change', (e) => {
       const input = e.target;
       const field = input.dataset.field;
       if (!field) return;
 
       const tr = input.closest('tr');
       const id = tr.dataset.id;
-      const record = records.find(r => r.id === id);
-      if (!record) return;
+      const item = receipts.find(r => r.id === id);
+      if (!item) return;
 
       if (field === 'amount') {
-        record[field] = parseFloat(input.value) || 0;
+        item[field] = parseFloat(input.value) || 0;
       } else {
-        record[field] = input.value;
+        item[field] = input.value;
       }
 
-      saveRecords();
+      saveToLocalStorage();
       updateDashboard();
-      showToast('Fila actualizada en tiempo real', 'info');
+      showToast('Actualizado en localStorage', 'info');
     });
 
-    tableBody.addEventListener('click', (e) => {
+    tbody.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-delete-row');
       if (!btn) return;
       const tr = btn.closest('tr');
       const id = tr.dataset.id;
-      records = records.filter(r => r.id !== id);
-      saveRecords();
+      receipts = receipts.filter(r => r.id !== id);
+      saveToLocalStorage();
       renderTable();
       updateDashboard();
-      showToast('Recibo eliminado de la lista', 'warning');
+      showToast('Recibo eliminado', 'warning');
     });
 
-    tableSearch.addEventListener('input', () => {
-      renderTable();
-    });
+    searchInput.addEventListener('input', renderTable);
 
-    async function processReceiptImageWithGemini(base64Data, mimeType = 'image/jpeg') {
-      processingSpinner.classList.remove('hidden');
-      processingSubtext.textContent = 'Analizando recibo con IA según criterios UPR...';
-
-      const nextNumber = `REC-${String(records.length + 1).padStart(3, '0')}`;
-
-      const prompt = `Analiza con cuidado la imagen de este recibo de compra para la Beca Fondo Dotal 2026 de la Universidad de Puerto Rico (UPR).
-Extrae la información y clasifícala estrictamente en una de las categorías oficiales de uso permitido:
-
-Categorías oficiales UPR posibles:
-1. "Alimentos"
-2. "Transportación (gasolina, peaje, pública)"
-3. "Gasto en libros"
-4. "Materiales para prácticas del programa"
-5. "Computadora o equipos electrónicos"
-6. "Matrícula"
-7. "Cuotas"
-8. "Laboratorios"
-9. "Hospedaje o dormitorio"
-10. "Vestimenta relacionada a estudios"
-11. "Cursos especializados o mejoramiento"
-12. "Pago o viajes a conferencias educativas"
-13. "Programa de computadora especializado"
-14. "Cuota para exámenes de entrada"
-15. "Estudios híbridos (Internet/adaptación)"
-16. "Otro gasto justificado"
-
-Responde en formato JSON con estas claves exactas:
-- "receiptNo": Número del ticket/recibo visible en la foto (ej: "FACT-4921"). Si no hay, pon "${nextNumber}".
-- "merchant": Nombre de la tienda, gasolinera o lugar donde se compró (ej: "Shell", "Librería Colegial", "Puma Energy", "Walmart", "Wendy's").
-- "date": Fecha en formato YYYY-MM-DD. Si no tiene año visible, asume 2026.
-- "time": Hora de la compra en formato HH:MM (24h). Si no está visible, pon "12:00".
-- "amount": Número decimal exacto con el total pagado (ej: 42.50).
-- "category": Exactamente una de las 16 categorías oficiales mencionadas arriba que mejor encaje.
-- "description": Resumen conciso de los artículos comprados o el motivo del gasto (ej: "Gasolina regular", "Libreta y bolígrafos", "Almuerzo combo").`;
-
-      const apiKey = settings.apiKey || '';
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-
-      const payload = {
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
-                }
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              "receiptNo": { "type": "STRING" },
-              "merchant": { "type": "STRING" },
-              "date": { "type": "STRING" },
-              "time": { "type": "STRING" },
-              "amount": { "type": "NUMBER" },
-              "category": { "type": "STRING" },
-              "description": { "type": "STRING" }
-            },
-            required: ["merchant", "amount", "category"]
-          }
-        }
-      };
+    // ==========================================
+    // OCR PROCESSING ENGINE (Tesseract.js)
+    // ==========================================
+    async function runOCR(imageSource) {
+      ocrOverlay.classList.remove('hidden');
+      ocrBar.style.width = '5%';
+      ocrTitle.textContent = 'Cargando motor de OCR...';
+      ocrSub.textContent = '0%';
 
       try {
-        let retries = 3;
-        let delay = 1000;
-        let response = null;
-
-        while (retries > 0) {
-          try {
-            response = await fetch(apiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            if (response.ok) break;
-          } catch (e) {
-            // retry silently
+        const worker = await Tesseract.createWorker(['spa', 'eng'], 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              const pct = Math.round(m.progress * 100);
+              ocrBar.style.width = `${pct}%`;
+              ocrTitle.textContent = 'Leyendo caracteres del recibo...';
+              ocrSub.textContent = `${pct}% completado`;
+            }
           }
-          retries--;
-          if (retries > 0) {
-            await new Promise(r => setTimeout(r, delay));
-            delay *= 2;
-          }
-        }
-
-        if (!response || !response.ok) {
-          throw new Error('No se pudo comunicar con el servicio de IA. Puedes registrarlo manualmente.');
-        }
-
-        const result = await response.json();
-        const candidate = result.candidates?.[0];
-        const jsonText = candidate?.content?.parts?.[0]?.text;
-
-        if (!jsonText) {
-          throw new Error('No se obtuvieron datos legibles del recibo.');
-        }
-
-        const parsed = JSON.parse(jsonText);
-
-        // Populate the Review Modal for user confirmation before inserting
-        openReviewModal({
-          receiptNo: parsed.receiptNo || nextNumber,
-          merchant: parsed.merchant || 'Comercio detectado',
-          date: parsed.date || new Date().toISOString().split('T')[0],
-          time: parsed.time || '12:00',
-          amount: typeof parsed.amount === 'number' ? parsed.amount : 0,
-          category: parsed.category || 'Alimentos',
-          description: parsed.description || 'Gasto procesado con recibo'
         });
 
-        showToast('Datos leídos. Revisa que todo esté correcto antes de meter a Excel.', 'info');
+        const ret = await worker.recognize(imageSource);
+        const fullText = ret.data.text || '';
+        await worker.terminate();
+
+        rawOcrTextEl.textContent = fullText || '(No se detectó texto en la imagen)';
+        
+        // Parse the raw OCR text with heuristics
+        const parsed = parseReceiptTextWithOCR(fullText);
+
+        ocrOverlay.classList.add('hidden');
+
+        // Open verification modal with extracted values
+        openReviewModal(parsed);
+        showToast('Texto OCR procesado. Confirma los datos antes de meterlos al Excel.', 'success');
+
       } catch (err) {
-        console.error('Error procesando recibo:', err);
-        showToast(err.message || 'Error analizando recibo. Intenta nuevamente.', 'error');
-        // Fallback: open blank review modal
+        console.error('OCR Error:', err);
+        ocrOverlay.classList.add('hidden');
+        showToast('No se pudo completar el OCR. Puedes ingresar los datos manualmente.', 'error');
         openReviewModal({
-          receiptNo: nextNumber,
+          receiptNo: `REC-${String(receipts.length + 1).padStart(3, '0')}`,
           merchant: '',
           date: new Date().toISOString().split('T')[0],
           time: '12:00',
@@ -955,31 +836,143 @@ Responde en formato JSON con estas claves exactas:
           category: 'Alimentos',
           description: ''
         });
-      } finally {
-        processingSpinner.classList.add('hidden');
       }
     }
 
+    // Heuristics parser to identify amount, date, time, receipt#, and category
+    function parseReceiptTextWithOCR(text) {
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const nextNum = `REC-${String(receipts.length + 1).padStart(3, '0')}`;
+
+      let merchant = '';
+      let amount = 0;
+      let date = new Date().toISOString().split('T')[0];
+      let time = '12:00';
+      let receiptNo = nextNum;
+      let category = 'Alimentos';
+      let description = '';
+
+      // 1. Merchant: usually in the first 3 lines
+      for (let i = 0; i < Math.min(4, lines.length); i++) {
+        const line = lines[i];
+        if (line.length > 3 && !/fecha|date|recibo|ticket|caja|tel|carr|#|\d{2}\/\d{2}/i.test(line)) {
+          merchant = line;
+          break;
+        }
+      }
+
+      // 2. Receipt number regex
+      const receiptMatch = text.match(/(?:recibo|ticket|factura|invoice|trans|orden|order|check)\s*[:#\s]?\s*([A-Za-z0-9\-_]{3,15})/i);
+      if (receiptMatch && receiptMatch[1]) {
+        receiptNo = receiptMatch[1].toUpperCase();
+      }
+
+      // 3. Date detection (DD/MM/YYYY or YYYY-MM-DD or MM/DD/YYYY)
+      const dateMatch = text.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2,4})/);
+      if (dateMatch) {
+        let p1 = dateMatch[1];
+        let p2 = dateMatch[2];
+        let p3 = dateMatch[3];
+        if (p3.length === 2) p3 = '20' + p3;
+        
+        // format to YYYY-MM-DD
+        const year = p3;
+        const month = String(p1).padStart(2, '0');
+        const day = String(p2).padStart(2, '0');
+        date = `${year}-${month}-${day}`;
+      }
+
+      // 4. Time detection (HH:MM)
+      const timeMatch = text.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?/);
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1], 10);
+        const m = timeMatch[2];
+        const ampm = timeMatch[3];
+        if (ampm) {
+          if (ampm.toLowerCase() === 'pm' && h < 12) h += 12;
+          if (ampm.toLowerCase() === 'am' && h === 12) h = 0;
+        }
+        time = `${String(h).padStart(2, '0')}:${m}`;
+      }
+
+      // 5. Total Amount detection (look for keywords like TOTAL, BALANCE, PAGADO)
+      const amountRegex = /(?:total|balance|pagar|importe|subtotal|ath|visa|cash|efectivo)[\s\S]{0,25}?\$?\s*([0-9]{1,4}[,\.][0-9]{2})/gi;
+      let matchedAmounts = [];
+      let m;
+      while ((m = amountRegex.exec(text)) !== null) {
+        const raw = m[1].replace(',', '.');
+        const num = parseFloat(raw);
+        if (!isNaN(num) && num > 0) {
+          matchedAmounts.push(num);
+        }
+      }
+
+      if (matchedAmounts.length > 0) {
+        // usually total is the highest matching monetary figure
+        amount = Math.max(...matchedAmounts);
+      } else {
+        // fallback regex for generic prices
+        const priceRegex = /\$\s*([0-9]{1,4}\.[0-9]{2})/g;
+        let match;
+        while ((match = priceRegex.exec(text)) !== null) {
+          const num = parseFloat(match[1]);
+          if (!isNaN(num)) matchedAmounts.push(num);
+        }
+        if (matchedAmounts.length > 0) {
+          amount = Math.max(...matchedAmounts);
+        }
+      }
+
+      // 6. UPR Category heuristic detection based on keywords
+      const lower = text.toLowerCase();
+      if (/gasolina|puma|shell|total|gulf|mobil|peaje|autoexpreso|estacion|pump|diesel/i.test(lower)) {
+        category = 'Transportación (gasolina, peaje, transportación pública)';
+        description = 'Combustible o peaje para transporte de estudios';
+      } else if (/librer[ií]a|book|libro|cuaderno|textbook|pearson|cengage|folleto/i.test(lower)) {
+        category = 'Gasto en libros';
+        description = 'Libros o material de lectura para cursos';
+      } else if (/apple|best buy|laptop|teclado|ipad|mouse|tinta|impresora|tablet|computadora|cable|hdmi/i.test(lower)) {
+        category = 'Computadora u otros equipos electrónicos como iPads, tabletas, impresoras, tintas, lápiz';
+        description = 'Equipo electrónico de estudio';
+      } else if (/cafeter[ií]a|restaurant|burger|pizza|subway|wendy|mcdonald|food|comida|panader[ií]a|almuerzo|desayuno|supermax|amigo|econo/i.test(lower)) {
+        category = 'Alimentos';
+        description = 'Alimentos consumidos durante estudios';
+      } else if (/laboratorio|reactivo|pipeta|bata/i.test(lower)) {
+        category = 'Laboratorios';
+        description = 'Material o cuota de laboratorio';
+      } else if (/matr[ií]cula|tuition|bursar|recaud/i.test(lower)) {
+        category = 'Matrícula';
+        description = 'Pago de matrícula universitaria';
+      } else if (/hospedaje|alquiler|renta|dormitorio/i.test(lower)) {
+        category = 'Hospedaje o dormitorio';
+        description = 'Alojamiento o hospedaje estudiantil';
+      } else {
+        category = 'Materiales para prácticas del programa que cursan';
+        description = 'Materiales y útiles académicos';
+      }
+
+      return {
+        receiptNo,
+        merchant: merchant || 'Comercio detectado por OCR',
+        date,
+        time,
+        amount,
+        category,
+        description
+      };
+    }
+
+    // Modal Handlers
     function openReviewModal(data) {
-      document.getElementById('rev-receipt-no').value = data.receiptNo || `REC-${String(records.length + 1).padStart(3, '0')}`;
+      document.getElementById('rev-no').value = data.receiptNo || `REC-${String(receipts.length + 1).padStart(3, '0')}`;
       document.getElementById('rev-merchant').value = data.merchant || '';
       document.getElementById('rev-date').value = data.date || new Date().toISOString().split('T')[0];
       document.getElementById('rev-time').value = data.time || '12:00';
       document.getElementById('rev-amount').value = data.amount || '';
-      document.getElementById('rev-description').value = data.description || '';
+      document.getElementById('rev-desc').value = data.description || '';
 
-      const select = document.getElementById('rev-category');
-      let found = false;
-      for (let i = 0; i < select.options.length; i++) {
-        if (select.options[i].value === data.category) {
-          select.selectedIndex = i;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        select.value = 'Alimentos';
-      }
+      const sel = document.getElementById('rev-category');
+      sel.value = data.category || 'Alimentos';
 
       modalReview.classList.remove('hidden');
     }
@@ -989,113 +982,108 @@ Responde en formato JSON con estas claves exactas:
     }
 
     btnCloseReview.addEventListener('click', closeReviewModal);
-    btnCancelReview.addEventListener('click', closeReviewModal);
+    btnCancelModal.addEventListener('click', closeReviewModal);
 
-    // Form submit confirmation: Insert into Excel
+    // Save verified receipt to localStorage and table
     formReview.addEventListener('submit', (e) => {
       e.preventDefault();
 
       const newRec = {
         id: 'rec_' + Date.now(),
-        receiptNo: document.getElementById('rev-receipt-no').value.trim() || `REC-${String(records.length + 1).padStart(3, '0')}`,
-        merchant: document.getElementById('rev-merchant').value.trim(),
+        receiptNo: document.getElementById('rev-no').value.trim() || `REC-${String(receipts.length + 1).padStart(3, '0')}`,
+        merchant: document.getElementById('rev-merchant').value.trim() || 'Comercio no especificado',
         date: document.getElementById('rev-date').value,
         time: document.getElementById('rev-time').value || '12:00',
         amount: parseFloat(document.getElementById('rev-amount').value) || 0,
         category: document.getElementById('rev-category').value,
-        description: document.getElementById('rev-description').value.trim() || 'Sin detalle adicional'
+        description: document.getElementById('rev-desc').value.trim() || 'Sin detalle'
       };
 
-      records.unshift(newRec);
-      saveRecords();
+      receipts.unshift(newRec);
+      saveToLocalStorage();
       renderTable();
       updateDashboard();
       closeReviewModal();
 
-      showToast(`¡Recibo ${newRec.receiptNo} ingresado a la lista con éxito! ($${newRec.amount.toFixed(2)})`, 'success');
+      showToast(`¡Recibo ${newRec.receiptNo} agregado al Excel y guardado en localStorage!`, 'success');
     });
 
-    function handleSelectedFile(file) {
+    // File input handlers
+    function handleFile(file) {
       if (!file || !file.type.startsWith('image/')) {
-        showToast('Por favor selecciona una imagen válida (JPG, PNG, WEBP).', 'warning');
+        showToast('Selecciona un archivo de imagen válido (PNG, JPG, WEBP).', 'warning');
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        const fullBase64 = e.target.result;
-        imagePreview.src = fullBase64;
+        const dataUrl = e.target.result;
+        imagePreview.src = dataUrl;
         uploadPrompt.classList.add('hidden');
         previewContainer.classList.remove('hidden');
 
-        const parts = fullBase64.split(',');
-        const mimeType = file.type || 'image/jpeg';
-        const base64Data = parts[1];
-
-        processReceiptImageWithGemini(base64Data, mimeType);
+        // Execute OCR directly on image
+        runOCR(dataUrl);
       };
       reader.readAsDataURL(file);
     }
 
-    receiptInput.addEventListener('change', (e) => {
+    receiptFileInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files[0]) {
-        handleSelectedFile(e.target.files[0]);
+        handleFile(e.target.files[0]);
       }
     });
 
-    document.getElementById('btn-trigger-upload').addEventListener('click', () => {
-      receiptInput.removeAttribute('capture');
-      receiptInput.click();
+    document.getElementById('btn-upload-file').addEventListener('click', () => {
+      receiptFileInput.removeAttribute('capture');
+      receiptFileInput.click();
     });
 
-    document.getElementById('btn-trigger-camera').addEventListener('click', () => {
-      receiptInput.setAttribute('capture', 'environment');
-      receiptInput.click();
+    document.getElementById('btn-open-camera').addEventListener('click', () => {
+      receiptFileInput.setAttribute('capture', 'environment');
+      receiptFileInput.click();
     });
 
     dropZone.addEventListener('click', (e) => {
       if (e.target !== btnRemoveImage && !btnRemoveImage.contains(e.target)) {
         if (previewContainer.classList.contains('hidden')) {
-          receiptInput.removeAttribute('capture');
-          receiptInput.click();
+          receiptFileInput.removeAttribute('capture');
+          receiptFileInput.click();
         }
       }
     });
 
     btnRemoveImage.addEventListener('click', (e) => {
       e.stopPropagation();
-      receiptInput.value = '';
+      receiptFileInput.value = '';
       imagePreview.src = '';
       previewContainer.classList.add('hidden');
       uploadPrompt.classList.remove('hidden');
     });
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
+    ['dragenter', 'dragover'].forEach(n => {
+      dropZone.addEventListener(n, (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('dropzone-active');
-      }, false);
+        dropZone.classList.add('dropzone-dragover');
+      });
     });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
+    ['dragleave', 'drop'].forEach(n => {
+      dropZone.addEventListener(n, (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('dropzone-active');
-      }, false);
+        dropZone.classList.remove('dropzone-dragover');
+      });
     });
 
     dropZone.addEventListener('drop', (e) => {
-      const dt = e.dataTransfer;
-      if (dt.files && dt.files[0]) {
-        handleSelectedFile(dt.files[0]);
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFile(e.dataTransfer.files[0]);
       }
     });
 
-    document.getElementById('btn-open-manual').addEventListener('click', () => {
+    document.getElementById('btn-manual-entry').addEventListener('click', () => {
       openReviewModal({
-        receiptNo: `REC-${String(records.length + 1).padStart(3, '0')}`,
+        receiptNo: `REC-${String(receipts.length + 1).padStart(3, '0')}`,
         merchant: '',
         date: new Date().toISOString().split('T')[0],
         time: '12:00',
@@ -1105,181 +1093,140 @@ Responde en formato JSON con estas claves exactas:
       });
     });
 
-    function exportToNativeExcel() {
-      if (records.length === 0) {
+    // Native Excel Export (.xlsx)
+    document.getElementById('btn-export-excel').addEventListener('click', () => {
+      if (receipts.length === 0) {
         showToast('No hay recibos en la tabla para exportar a Excel.', 'warning');
         return;
       }
 
-      try {
-        const totalSpent = records.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
-        const remaining = Math.max(0, totalFund - totalSpent);
+      const totalSpent = receipts.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
+      const remaining = Math.max(0, totalFund - totalSpent);
 
-        // Sheet 1: Detailed List
-        const excelData = records.map((r) => ({
-          '# Recibo': r.receiptNo || '',
-          'Fecha': r.date || '',
-          'Hora': r.time || '',
-          'Lugar / Comercio': r.merchant || '',
-          'Categoría Beca UPR': r.category || '',
-          'Monto Gastado ($)': Number(r.amount || 0),
-          'Descripción / Artículos': r.description || ''
-        }));
+      const rows = receipts.map(r => ({
+        '# Recibo': r.receiptNo || '',
+        'Fecha': r.date || '',
+        'Hora': r.time || '',
+        'Lugar / Tienda': r.merchant || '',
+        'Categoría UPR (Fondo Dotal)': r.category || '',
+        'Monto ($)': Number(r.amount || 0),
+        'Descripción de Compra': r.description || ''
+      }));
 
-        // Totals row
-        excelData.push({
-          '# Recibo': 'TOTALES',
-          'Fecha': '',
-          'Hora': '',
-          'Lugar / Comercio': `Fondo Original: $${totalFund.toFixed(2)}`,
-          'Categoría Beca UPR': `Disponible: $${remaining.toFixed(2)}`,
-          'Monto Gastado ($)': totalSpent,
-          'Descripción / Artículos': `${records.length} recibos procesados`
-        });
+      // Append Summary row
+      rows.push({
+        '# Recibo': 'TOTALES',
+        'Fecha': '',
+        'Hora': '',
+        'Lugar / Tienda': `Presupuesto Beca: $${totalFund.toFixed(2)}`,
+        'Categoría UPR (Fondo Dotal)': `Disponible: $${remaining.toFixed(2)}`,
+        'Monto ($)': totalSpent,
+        'Descripción de Compra': `${receipts.length} recibos procesados`
+      });
 
-        const wb = XLSX.utils.book_new();
-        const wsDetails = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      const wsDetails = XLSX.utils.json_to_sheet(rows);
 
-        wsDetails['!cols'] = [
-          { wch: 12 }, // # Recibo
-          { wch: 14 }, // Fecha
-          { wch: 10 }, // Hora
-          { wch: 26 }, // Comercio
-          { wch: 34 }, // Categoria
-          { wch: 18 }, // Monto
-          { wch: 45 }  // Descripcion
-        ];
+      wsDetails['!cols'] = [
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 28 },
+        { wch: 36 },
+        { wch: 16 },
+        { wch: 45 }
+      ];
 
-        // Sheet 2: Category Breakdown
-        const catMap = {};
-        records.forEach(r => {
-          const c = r.category || 'Otros';
-          catMap[c] = (catMap[c] || 0) + (Number(r.amount) || 0);
-        });
+      XLSX.utils.book_append_sheet(wb, wsDetails, 'Gastos Fondo Dotal 2026');
 
-        const summaryData = Object.entries(catMap).map(([category, amount]) => ({
-          'Especificación de Gasto UPR': category,
-          'Monto Acumulado ($)': Number(amount.toFixed(2)),
-          '% del Total Gastado': `${((amount / (totalSpent || 1)) * 100).toFixed(1)}%`,
-          '% del Fondo Total ($1,800)': `${((amount / totalFund) * 100).toFixed(1)}%`
-        }));
-
-        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-        wsSummary['!cols'] = [{ wch: 38 }, { wch: 22 }, { wch: 20 }, { wch: 25 }];
-
-        XLSX.utils.book_append_sheet(wb, wsDetails, 'Detalle de Gastos');
-        XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen por Especificación');
-
-        const fileName = `Informe_Beca_Fondo_Dotal_1800_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-
-        showToast(`Archivo "${fileName}" descargado con éxito.`, 'success');
-      } catch (err) {
-        console.error('Error exportando Excel:', err);
-        showToast('Error al generar el archivo Excel.', 'error');
-      }
-    }
-
-    document.getElementById('btn-export-excel').addEventListener('click', exportToNativeExcel);
-
-    // Clear Table Action
-    document.getElementById('btn-clear-table').addEventListener('click', () => {
-      if (records.length === 0) return;
-      records = [];
-      saveRecords();
-      renderTable();
-      updateDashboard();
-      showToast('Se han vaciado todos los registros.', 'warning');
+      const fileName = `Informe_Beca_Fondo_Dotal_1800_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      showToast('Archivo Excel (.xlsx) generado y descargado.', 'success');
     });
 
-    // Quick Sample Receipt Trigger (Generates dummy image with realistic data)
-    document.getElementById('btn-quick-sample').addEventListener('click', () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 500;
-      canvas.height = 680;
-      const ctx = canvas.getContext('2d');
+    // Clear All (Reset LocalStorage)
+    document.getElementById('btn-clear-all').addEventListener('click', () => {
+      if (receipts.length === 0) return;
+      receipts = [];
+      saveToLocalStorage();
+      renderTable();
+      updateDashboard();
+      showToast('Se han eliminado todos los recibos de localStorage.', 'warning');
+    });
+
+    // Demo receipt generator using Canvas (to test OCR immediately)
+    document.getElementById('btn-load-demo').addEventListener('click', () => {
+      const c = document.createElement('canvas');
+      c.width = 460;
+      c.height = 580;
+      const ctx = c.getContext('2d');
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, c.width, c.height);
 
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 22px monospace';
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 20px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('SHELL ISABELA STATION', 250, 60);
+      ctx.fillText('TOTAL PETROLEUM PUERTO RICO', 230, 50);
 
       ctx.font = '13px monospace';
-      ctx.fillText('Carr. #2 Km 112.5 - Isabela, PR', 250, 90);
-      ctx.fillText('RECIBO #: SHL-984210', 250, 115);
-      ctx.fillText('========================================', 250, 135);
+      ctx.fillText('Carr. #2 Km 120 - Mayaguez, PR', 230, 80);
+      ctx.fillText('RECIBO #: TOT-77291', 230, 105);
+      ctx.fillText('======================================', 230, 125);
 
-      const todayStr = new Date().toISOString().split('T')[0];
       ctx.textAlign = 'left';
-      ctx.fillText(`FECHA: ${todayStr}    HORA: 15:45`, 40, 165);
-      ctx.fillText(`BOMBA: #04           PRODUCTO: REGULAR`, 40, 195);
-      ctx.fillText('----------------------------------------', 40, 220);
+      ctx.fillText('FECHA: 2026-03-05   HORA: 14:22', 30, 155);
+      ctx.fillText('BOMBA #02 - GASOLINA REGULAR', 30, 185);
+      ctx.fillText('--------------------------------------', 30, 210);
 
-      ctx.fillText('CANT.  DESCRIPCION                 TOTAL', 40, 250);
-      ctx.fillText('1      Gasolina Regular (Auto)    $35.00', 40, 280);
-      ctx.fillText('1      Agua embotellada 1L         $1.75', 40, 310);
-      ctx.fillText('----------------------------------------', 40, 340);
+      ctx.fillText('CANT.  ARTICULO                 TOTAL', 30, 240);
+      ctx.fillText('1      Gasolina Regular 87 Oct  $38.50', 30, 270);
+      ctx.fillText('1      Agua y refrigerio         $3.25', 30, 300);
+      ctx.fillText('--------------------------------------', 30, 330);
 
-      ctx.fillText('SUBTOTAL:                         $36.75', 40, 370);
-      ctx.fillText('IVU MUNICIPAL & ESTATAL:           $0.20', 40, 400);
+      ctx.fillText('SUBTOTAL:                      $41.75', 30, 360);
+      ctx.fillText('IVU ESTATAL & MUNICIPAL:        $0.75', 30, 390);
       ctx.font = 'bold 18px monospace';
-      ctx.fillText('TOTAL PAGADO:                     $36.95', 40, 440);
+      ctx.fillText('TOTAL:                         $42.50', 30, 430);
 
       ctx.font = '13px monospace';
-      ctx.fillText('METODO: ATH / DEBITO', 40, 480);
+      ctx.fillText('METODO: ATH / DEBITO', 30, 470);
       ctx.textAlign = 'center';
-      ctx.fillText('¡GRACIAS POR SU COMPRA!', 250, 530);
+      ctx.fillText('GRACIAS POR SU VISITA', 230, 520);
 
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      imagePreview.src = dataUrl;
+      const demoUrl = c.toDataURL('image/png');
+      imagePreview.src = demoUrl;
       uploadPrompt.classList.add('hidden');
       previewContainer.classList.remove('hidden');
 
-      const base64Data = dataUrl.split(',')[1];
-      showToast('Leyendo recibo de prueba con IA...', 'info');
-      processReceiptImageWithGemini(base64Data, 'image/jpeg');
+      showToast('Ejecutando OCR en recibo simulado...', 'info');
+      runOCR(demoUrl);
     });
 
     // Settings Modal
     const modalSettings = document.getElementById('modal-settings');
-    const btnSettingsToggle = document.getElementById('btn-settings-toggle');
-    const btnCloseSettings = document.getElementById('btn-close-settings');
-    const btnSaveSettings = document.getElementById('btn-save-settings');
-
-    btnSettingsToggle.addEventListener('click', () => {
+    document.getElementById('btn-open-settings').addEventListener('click', () => {
       modalSettings.classList.remove('hidden');
     });
-
-    btnCloseSettings.addEventListener('click', () => {
+    document.getElementById('btn-close-settings').addEventListener('click', () => {
       modalSettings.classList.add('hidden');
     });
-
-    btnSaveSettings.addEventListener('click', () => {
-      const fundInput = parseFloat(document.getElementById('setting-total-fund').value);
-      totalFund = (!isNaN(fundInput) && fundInput > 0) ? fundInput : 1800.00;
-      settings.totalFund = totalFund;
-      settings.apiKey = document.getElementById('custom-api-key').value.trim();
-
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      modalSettings.classList.add('hidden');
-      updateDashboard();
-      showToast('Configuración actualizada correctamente.', 'success');
+    document.getElementById('btn-save-fund').addEventListener('click', () => {
+      const val = parseFloat(document.getElementById('setting-fund-amount').value);
+      if (!isNaN(val) && val > 0) {
+        totalFund = val;
+        saveToLocalStorage();
+        updateDashboard();
+        modalSettings.classList.add('hidden');
+        showToast(`Fondo actualizado a $${totalFund.toFixed(2)}`, 'success');
+      }
     });
 
-    document.getElementById('btn-reset-demo').addEventListener('click', () => {
-      localStorage.removeItem(STORAGE_KEY);
-      loadSavedData();
-      modalSettings.classList.add('hidden');
-      showToast('Datos restablecidos a los valores predeterminados.', 'info');
+    // Init on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initChart();
+      loadFromLocalStorage();
     });
-
-    window.onload = function() {
-      initBudgetChart();
-      loadSavedData();
-    };
   </script>
 </body>
 </html>
